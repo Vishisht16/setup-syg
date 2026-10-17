@@ -5,20 +5,33 @@ on `PATH`, on Linux, macOS and Windows runners.
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   - uses: vishisht16/setup-syg@v1
   - run: syg check --format github
 ```
 
 `--format github` turns every finding into an annotation on the pull request's
-diff, at the line it is about. To upload findings to code scanning instead:
+diff, at the line it is about. It works in any repository.
+
+To upload findings to code scanning instead, the job needs permission to
+write security events, and the upload runs even when the check fails:
 
 ```yaml
+permissions:
+  contents: read
+  security-events: write
+steps:
+  - uses: actions/checkout@v7
+  - uses: vishisht16/setup-syg@v1
   - run: syg check --format sarif > syg.sarif
-  - uses: github/codeql-action/upload-sarif@v3
+  - uses: github/codeql-action/upload-sarif@v4
+    if: always()
     with:
       sarif_file: syg.sarif
 ```
+
+Code scanning is free for public repositories. A private repository needs
+GitHub Code Security for it; without it, the upload is refused.
 
 ## Inputs
 

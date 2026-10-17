@@ -41,7 +41,8 @@ runs:
           sh "$RUNNER_TEMP/install-syg.sh"
         fi
         echo "$dir" >> "$GITHUB_PATH"
-        v=$("$dir/syg" version | awk '{print $2}')
+        # Setting up is not using Syg: this probe sends no usage statistics.
+        v=$(SYG_TELEMETRY=off "$dir/syg" version | awk '{print $2}')
         echo "version=$v" >> "$GITHUB_OUTPUT"
         echo "Installed syg $v"
     - if: ${{ inputs.telemetry == 'false' }}
