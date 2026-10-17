@@ -1,0 +1,49 @@
+name: Set up Syg
+description: Install Syg, the typed language and checker for Kubernetes deployments, and put it on PATH.
+author: Vishisht
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  version:
+    description: "The version to install, e.g. 1.0.0. Default: the latest release."
+    required: false
+    default: ""
+  telemetry:
+    description: "Whether Syg may send anonymous usage statistics from this job (https://syg.vishisht.tech/privacy). Set false to turn them off."
+    required: false
+    default: "true"
+outputs:
+  version:
+    description: The version installed.
+    value: ${{ steps.install.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        SYG_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        dir="$RUNNER_TOOL_CACHE/syg/bin"
+        if [ -z "$SYG_VERSION" ]; then
+          SYG_VERSION=$(gh api repos/vishisht16/syg/releases/latest --jq .tag_name) \
+            || { echo "::error::could not find the latest release of syg; set the version input"; exit 1; }
+        fi
+        export SYG_VERSION SYG_INSTALL_DIR="$dir"
+        installers=https://raw.githubusercontent.com/vishisht16/syg/main
+        if [ "$RUNNER_OS" = Windows ]; then
+          pwsh -NoProfile -Command "irm $installers/install.ps1 | iex"
+        else
+          curl -fsSL -o "$RUNNER_TEMP/install-syg.sh" "$installers/install.sh"
+          sh "$RUNNER_TEMP/install-syg.sh"
+        fi
+        echo "$dir" >> "$GITHUB_PATH"
+        v=$("$dir/syg" version | awk '{print $2}')
+        echo "version=$v" >> "$GITHUB_OUTPUT"
+        echo "Installed syg $v"
+    - if: ${{ inputs.telemetry == 'false' }}
+      shell: bash
+      run: echo "SYG_TELEMETRY=off" >> "$GITHUB_ENV"
