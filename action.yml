@@ -67,10 +67,8 @@ runs:
         echo "checksum verified: $archive"
 
         # Built and signed by the release's build workflow, in Syg's
-        # repository. Releases up to 1.0.0-rc.3 were signed by release.yml.
-        workflow=build.yml
-        case "$version" in 1.0.0-rc.[123]) workflow=release.yml ;; esac
-        signer="$repo/.github/workflows/$workflow"
+        # repository.
+        signer="$repo/.github/workflows/build.yml"
         gh attestation verify "$tmp/$archive" --repo "$repo" --signer-workflow "$signer" > /dev/null \
           || fail "the provenance of $archive does not verify: it was not built by $signer"
         echo "provenance verified: built by $signer"

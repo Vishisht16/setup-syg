@@ -50,8 +50,7 @@ these pass:
 - its build provenance verifies (`gh attestation verify`): the archive was
   built and signed by Syg's release workflow,
   `.github/workflows/build.yml` in
-  [vishisht16/syg](https://github.com/vishisht16/syg) (`release.yml` for
-  1.0.0-rc.1 to 1.0.0-rc.3).
+  [vishisht16/syg](https://github.com/vishisht16/syg).
 
 It reads the public release with the job's token; the default permissions
 are enough. On a self-hosted runner, it needs the GitHub CLI (`gh`).
