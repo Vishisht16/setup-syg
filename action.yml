@@ -20,6 +20,8 @@ outputs:
 runs:
   using: composite
   steps:
+    # The release's archive for this runner, checked against the release's
+    # SHA256SUMS and its build provenance before anything in it runs.
     - id: install
       shell: bash
       env:
@@ -27,22 +29,64 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        dir="$RUNNER_TOOL_CACHE/syg/bin"
-        if [ -z "$SYG_VERSION" ]; then
-          SYG_VERSION=$(gh api repos/vishisht16/syg/releases/latest --jq .tag_name) \
-            || { echo "::error::could not find the latest release of syg; set the version input"; exit 1; }
+        repo=Vishisht16/Syg
+        fail() { echo "::error::$*"; exit 1; }
+        command -v gh > /dev/null || fail "setup-syg needs the GitHub CLI (gh) on the runner"
+
+        version=${SYG_VERSION#v}
+        if [ -z "$version" ]; then
+          tag=$(gh api "repos/$repo/releases/latest" --jq .tag_name) \
+            || fail "could not find the latest release of Syg; set the version input"
+          version=${tag#v}
         fi
-        export SYG_VERSION SYG_INSTALL_DIR="$dir"
-        installers=https://raw.githubusercontent.com/vishisht16/syg/main
-        if [ "$RUNNER_OS" = Windows ]; then
-          pwsh -NoProfile -Command "irm $installers/install.ps1 | iex"
+        printf '%s\n' "$version" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' \
+          || fail "$version is not a version of Syg, like 1.0.0"
+        case "$RUNNER_OS" in
+          Linux) os=linux ext=tar.gz ;;
+          macOS) os=darwin ext=tar.gz ;;
+          Windows) os=windows ext=zip ;;
+          *) fail "Syg has no build for $RUNNER_OS" ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) fail "Syg has no build for $RUNNER_OS on $RUNNER_ARCH" ;;
+        esac
+        archive="syg_${version}_${os}_${arch}.$ext"
+        tmp="$RUNNER_TEMP/setup-syg"
+        rm -rf "$tmp" && mkdir -p "$tmp"
+        gh release download "v$version" --repo "$repo" --dir "$tmp" --pattern "$archive" --pattern SHA256SUMS \
+          || fail "could not download $archive from Syg's release v$version"
+
+        want=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/SHA256SUMS")
+        if command -v sha256sum > /dev/null; then got=$(sha256sum "$tmp/$archive"); else got=$(shasum -a 256 "$tmp/$archive"); fi
+        got=${got%% *}
+        if [ -z "$want" ] || [ "$got" != "$want" ]; then fail "$archive does not match the release's SHA256SUMS"; fi
+        echo "checksum verified: $archive"
+
+        # Built and signed by the release's build workflow, in Syg's
+        # repository. Releases up to 1.0.0-rc.3 were signed by release.yml.
+        workflow=build.yml
+        case "$version" in 1.0.0-rc.[123]) workflow=release.yml ;; esac
+        signer="$repo/.github/workflows/$workflow"
+        gh attestation verify "$tmp/$archive" --repo "$repo" --signer-workflow "$signer" > /dev/null \
+          || fail "the provenance of $archive does not verify: it was not built by $signer"
+        echo "provenance verified: built by $signer"
+
+        dir="$RUNNER_TOOL_CACHE/syg/$version/$arch"
+        rm -rf "$dir" && mkdir -p "$dir"
+        if [ "$os" != windows ]; then
+          tar -xzf "$tmp/$archive" -C "$dir"
+        elif command -v unzip > /dev/null; then
+          unzip -q "$tmp/$archive" -d "$dir"
         else
-          curl -fsSL -o "$RUNNER_TEMP/install-syg.sh" "$installers/install.sh"
-          sh "$RUNNER_TEMP/install-syg.sh"
+          ARCHIVE="$tmp/$archive" DEST="$dir" powershell -NoProfile -Command 'Expand-Archive -LiteralPath $env:ARCHIVE -DestinationPath $env:DEST'
         fi
-        echo "$dir" >> "$GITHUB_PATH"
+        rm -rf "$tmp"
         # Setting up is not using Syg: this probe sends no usage statistics.
         v=$(SYG_TELEMETRY=off "$dir/syg" version | awk '{print $2}')
+        [ "$v" = "$version" ] || fail "$archive holds syg $v, not $version"
+        echo "$dir" >> "$GITHUB_PATH"
         echo "version=$v" >> "$GITHUB_OUTPUT"
         echo "Installed syg $v"
     - if: ${{ inputs.telemetry == 'false' }}

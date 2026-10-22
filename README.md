@@ -1,7 +1,7 @@
 # setup-syg
 
 Installs [Syg](https://syg.vishisht.tech) in a GitHub Actions job and puts it
-on `PATH`, on Linux, macOS and Windows runners.
+on `PATH`, on Linux, macOS and Windows runners, x64 and Arm64.
 
 ```yaml
 steps:
@@ -40,5 +40,23 @@ GitHub Code Security for it; without it, the upload is refused.
 | `version` | the latest release | a version to pin, e.g. `1.0.0` |
 | `telemetry` | `true` | `false` turns off Syg's anonymous usage statistics for the job ([what they are](https://syg.vishisht.tech/privacy)) |
 
-The installer verifies every download against the release's published
-checksums.
+## What it checks
+
+The action downloads the release's archive for the runner, and the release's
+`SHA256SUMS`, with the GitHub CLI. Nothing in the archive runs until both of
+these pass:
+
+- the archive's SHA-256 is the one `SHA256SUMS` lists;
+- its build provenance verifies (`gh attestation verify`): the archive was
+  built and signed by Syg's release workflow,
+  `.github/workflows/build.yml` in
+  [vishisht16/syg](https://github.com/vishisht16/syg) (`release.yml` for
+  1.0.0-rc.1 to 1.0.0-rc.3).
+
+It reads the public release with the job's token; the default permissions
+are enough. On a self-hosted runner, it needs the GitHub CLI (`gh`).
+
+## Licence
+
+This action is under the MIT licence ([LICENSE](LICENSE)). Syg, which it
+installs, is under the [Syg EULA](https://syg.vishisht.tech/eula).
