@@ -1,10 +1,13 @@
 version: 2
 updates:
-  # Monthly, one pull request: the workflows' actions, pinned by commit.
+  # Monthly, one pull request: the workflows' actions, pinned by commit. A
+  # version is proposed once it has been out for two weeks.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 14
     groups:
       actions:
         patterns: ["*"]

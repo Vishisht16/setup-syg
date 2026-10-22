@@ -21,13 +21,15 @@ runs:
   using: composite
   steps:
     # The release's archive for this runner, checked against the release's
-    # SHA256SUMS and its build provenance before anything in it runs.
+    # SHA256SUMS and its build provenance before anything in it runs. What it
+    # adds to GITHUB_PATH is the tool cache's directory for a version checked
+    # against the pattern of a version, so it cannot carry a line of its own.
     - id: install
       shell: bash
       env:
         SYG_VERSION: ${{ inputs.version }}
         GH_TOKEN: ${{ github.token }}
-      run: |
+      run: | # zizmor: ignore[github-env]
         set -euo pipefail
         repo=Vishisht16/Syg
         fail() { echo "::error::$*"; exit 1; }
