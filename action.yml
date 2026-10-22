@@ -59,7 +59,9 @@ runs:
           || fail "could not download $archive from Syg's release v$version"
 
         want=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/SHA256SUMS")
-        if command -v sha256sum > /dev/null; then got=$(sha256sum "$tmp/$archive"); else got=$(shasum -a 256 "$tmp/$archive"); fi
+        # From stdin: given a path with a backslash, as RUNNER_TEMP is on
+        # Windows, sha256sum escapes the line it prints with one.
+        if command -v sha256sum > /dev/null; then got=$(sha256sum < "$tmp/$archive"); else got=$(shasum -a 256 < "$tmp/$archive"); fi
         got=${got%% *}
         if [ -z "$want" ] || [ "$got" != "$want" ]; then fail "$archive does not match the release's SHA256SUMS"; fi
         echo "checksum verified: $archive"
